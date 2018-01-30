@@ -18,7 +18,7 @@ PLAT?=linux
 
 # LUAV: 5.1 5.2
 # lua version to build against
-LUAV?=5.3
+LUAV?=5.1
 
 # MYCFLAGS: to be set by user if needed
 MYCFLAGS?=
@@ -165,7 +165,8 @@ SOCKET_macosx=usocket.o
 SO_linux=so
 O_linux=o
 CC_linux=gcc
-DEF_linux=-DLUASOCKET_$(DEBUG) \
+DEF_linux=-DLUASOCKET_NETLINK \
+	-DLUASOCKET_$(DEBUG) \
 	-DLUASOCKET_API='__attribute__((visibility("default")))' \
 	-DUNIX_API='__attribute__((visibility("default")))' \
 	-DMIME_API='__attribute__((visibility("default")))'
