@@ -1,9 +1,5 @@
 #include "timeout.h"
 #include "lua.h"
-#include "lauxlib.h"
-#include "compat.h"
-#include "lualib.h"
-#include "auxiliar.h"
 #include "socket.h"
 
 #define MAX_PAYLOAD 2048
@@ -21,8 +17,6 @@ typedef struct t_netlink_{
 	t_socket fd; /*socket number (int)*/
 	t_timeout tm; /*timeout value (timeval)*/ 
 	t_pid srcpid; /*port id (int) */
-	t_pid dstpid; /*destination port id (int)*/
-	t_groups grp; /*group bitmask (int)*/
 	t_type type; /*socket type (int)*/
 }t_netlink;
 typedef t_netlink *p_netlink;

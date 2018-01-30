@@ -28,12 +28,12 @@ static int meth_close(lua_State *L);
 static int meth_settimeout(lua_State *L);
 static int meth_gettimeout(lua_State *L);
 static int meth_getfd(lua_State *L);
-static int meth_setoptions(lua_State *L);
 static int meth_setfd(lua_State *L);
 static int meth_getpeername(lua_State *L);
 static int meth_setpeername(lua_State *L);
+static int meth_getsockpid(lua_State *L);
 
-static const char *netlink_trybind(p_netlink nl);
+static const char *netlink_trybind(p_netlink nl,int grp);
 
 /* unixdgram object methods */
 static luaL_Reg netlink_methods[] = {
@@ -47,12 +47,11 @@ static luaL_Reg netlink_methods[] = {
     {"receivefrom", meth_receivefrom},
     {"receive",     meth_receive},
     {"setfd",       meth_setfd},
-    {"setsockname", meth_bind},
     {"settimeout",  meth_settimeout},
-    {"setoptions",  meth_setoptions},
     {"gettimeout",  meth_gettimeout},
     {"setpeername", meth_setpeername},
     {"getpeername", meth_getpeername},
+    {"getsockpid",  meth_getsockpid},
     {NULL,          NULL}
 };
 
@@ -92,16 +91,9 @@ static int meth_send(lua_State *L){
 	const char *payload=luaL_checklstring(L,2,&payload_size);
 	p_timeout tm = &nl->tm; 
 
-	int groups = luaL_optinteger(L,3,0);
-	int flags = luaL_optinteger(L,4,0);
+	int flags = luaL_optinteger(L,3,0);
 
-	struct sockaddr_nl addr;
 	struct nlmsghdr *nlh;
-
-	memset(&addr,0,sizeof(addr));
-	addr.nl_pid=nl->dstpid;
-	addr.nl_family=AF_NETLINK;
-	addr.nl_groups=groups;
 
 	nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(payload_size));
 	memset(nlh, 0, NLMSG_SPACE(payload_size));
@@ -111,7 +103,7 @@ static int meth_send(lua_State *L){
 
 	memcpy(NLMSG_DATA(nlh),payload,payload_size);
 
-	int err = socket_sendto(&nl->fd,NLMSG_DATA(nlh),nlh->nlmsg_len,&sent,(struct sockaddr *)&addr,sizeof(addr),tm);
+	int err = socket_send(&nl->fd,(char *)nlh,nlh->nlmsg_len,&sent,tm);
 	if(err!=IO_DONE){
 		lua_pushnil(L);
 		lua_pushliteral(L,"error sending message");
@@ -150,7 +142,7 @@ static int meth_sendto(lua_State *L){
 
 	memcpy(NLMSG_DATA(nlh),payload,payload_size);
 
-	int err = socket_sendto(&nl->fd,NLMSG_DATA(nlh),nlh->nlmsg_len,&sent,(struct sockaddr *)&addr,sizeof(addr),tm);
+	int err = socket_sendto(&nl->fd,(char *)nlh,nlh->nlmsg_len,&sent,(struct sockaddr *)&addr,sizeof(addr),tm);
 	if(err!=IO_DONE){
 		lua_pushnil(L);
 		lua_pushliteral(L,"error sending message");
@@ -165,9 +157,7 @@ static int meth_sendto(lua_State *L){
 \*-------------------------------------------------------------------------*/
 static int meth_receive(lua_State *L){
 	p_netlink nl= (p_netlink) auxiliar_checkclass(L,"netlink{connected}",1);
-	struct sockaddr_nl dst;
 	struct nlmsghdr *nlh;
-	struct iovec iov;
 	size_t got;
 	p_timeout tm = &nl->tm;
 
@@ -175,10 +165,7 @@ static int meth_receive(lua_State *L){
 	memset(nlh,0,NLMSG_SPACE(MAX_PAYLOAD));
 	nlh->nlmsg_len=NLMSG_SPACE(MAX_PAYLOAD);
 
-	iov.iov_base=(void *)nlh;
-	iov.iov_len=nlh->nlmsg_len;
-	socklen_t len=sizeof(dst);
-	int err= socket_recvfrom(&nl->fd,NLMSG_DATA(nlh),nlh->nlmsg_len,&got,(struct sockaddr *)&dst,&len,tm);
+	int err= socket_recv(&nl->fd,(char *)nlh,nlh->nlmsg_len,&got,tm);
     	if (err != IO_DONE && err != IO_CLOSED) {
         	lua_pushnil(L);
        		lua_pushstring(L,socket_strerror(err));
@@ -196,7 +183,6 @@ static int meth_receivefrom(lua_State *L) {
 	p_netlink nl= (p_netlink) auxiliar_checkclass(L,"netlink{unconnected}",1);
 	struct sockaddr_nl dst;
 	struct nlmsghdr *nlh;
-	struct iovec iov;
 	size_t got;
 	p_timeout tm = &nl->tm;
 
@@ -204,10 +190,8 @@ static int meth_receivefrom(lua_State *L) {
 	memset(nlh,0,NLMSG_SPACE(MAX_PAYLOAD));
 	nlh->nlmsg_len=NLMSG_SPACE(MAX_PAYLOAD);
 
-	iov.iov_base=(void *)nlh;
-	iov.iov_len=nlh->nlmsg_len;
 	socklen_t len=sizeof(dst);
-	int err= socket_recvfrom(&nl->fd,NLMSG_DATA(nlh),nlh->nlmsg_len,&got,(struct sockaddr *)&dst,&len,tm);
+	int err= socket_recvfrom(&nl->fd,(char *)nlh,nlh->nlmsg_len,&got,(struct sockaddr *)&dst,&len,tm);
     	if (err != IO_DONE && err != IO_CLOSED) {
         	lua_pushnil(L);
        		lua_pushstring(L,socket_strerror(err));
@@ -235,16 +219,23 @@ static int meth_setfd(lua_State *L) {
     return 0;
 }
 
+static int meth_getsockpid(lua_State *L){
+	p_netlink nl = auxiliar_checkgroup(L,"netlink{any}",1);
+	lua_pushinteger(L,nl->srcpid);
+	return 1;
+}
+
 /*-------------------------------------------------------------------------*\
 * Binds an object to an address
 \*-------------------------------------------------------------------------*/
-static const char *netlink_trybind(p_netlink nl) {
+static const char *netlink_trybind(p_netlink nl,int grp) {
 	struct sockaddr_nl addr;
 
 	memset(&addr,0,sizeof(addr));
+	addr.nl_family=AF_NETLINK;
+	addr.nl_groups=grp;	
 	addr.nl_pid=nl->srcpid;
-	addr.nl_family=AF_NETLINK;	
-	addr.nl_groups=nl->grp;
+	getpeername(nl->fd,(struct sockaddr *)&addr,(socklen_t *)sizeof(addr));
 
 	//int res=bind(p,(struct sockaddr *)&addr,sizeof(addr));
 	int err = socket_bind(&nl->fd,(struct sockaddr *)&addr,sizeof(addr));
@@ -255,15 +246,14 @@ static int meth_bind(lua_State *L)
 {
     	p_netlink nl = (p_netlink) auxiliar_checkclass(L, "netlink{unconnected}", 1);
 	int pid=luaL_checkinteger(L,2);
-	int grp=luaL_checkinteger(L,3);
+	int grp=luaL_optinteger(L,3,0);
     	if(!nl){
 		lua_pushnil(L);
 		lua_pushliteral(L,"invalid socket");
 		return 2;	
 	}
 	nl->srcpid=pid;
-	nl->grp=grp;
-	const char *err = netlink_trybind(nl);
+	const char *err = netlink_trybind(nl,grp);
 	if (err) {
 		lua_pushnil(L);
 	        lua_pushstring(L, err);
@@ -289,17 +279,45 @@ static int meth_close(lua_State *L)
 * Just call tm methods
 \*-------------------------------------------------------------------------*/
 static int meth_setpeername(lua_State *L){
-	p_netlink nl = (p_netlink) auxiliar_checkclass(L,"netlink{unconnected}",1);
+	p_netlink nl;
+	struct sockaddr_nl addr;
+	if(lua_isnone(L,2)){
+		nl=auxiliar_checkclass(L,"netlink{connected}",1);
+		addr.nl_family=AF_UNSPEC;
+		socket_connect(&nl->fd,(struct sockaddr *)&addr,(socklen_t)sizeof(addr),&nl->tm);
+		auxiliar_setclass(L,"netlink{unconnected}",1);
+		return 0;
+	}
+	nl=auxiliar_checkclass(L,"netlink{unconnected}",1);
 	int dstpid = luaL_checkinteger(L,2);
-	nl->dstpid=dstpid;
+	int grps = luaL_optinteger(L,3,0);
+	addr.nl_pid=dstpid;
+	addr.nl_groups=grps;
+	addr.nl_family=AF_NETLINK;
+
+	int err=socket_connect(&nl->fd,(struct sockaddr *)&addr,(socklen_t)sizeof(addr),&nl->tm);
+	if(err!=IO_DONE){
+		lua_pushnil(L);
+		lua_pushstring(L,socket_strerror(errno));
+		return 2;
+	}
 	auxiliar_setclass(L,"netlink{connected}",1);
-	return 0;
+	lua_pushinteger(L,err);
+	return 1;
 }
 
 static int meth_getpeername(lua_State *L){
 	p_netlink nl = (p_netlink) auxiliar_checkclass(L,"netlink{connected}",1);
-	lua_pushinteger(L,nl->dstpid);
-	return 1;
+	struct sockaddr_nl peer;
+	socklen_t peer_len = sizeof(peer);
+	if (getpeername(nl->fd, (SA *) &peer, &peer_len) < 0) {
+		lua_pushnil(L);
+		lua_pushstring(L, socket_strerror(errno));
+	    	return 2;
+	}
+	lua_pushinteger(L,peer.nl_groups);
+	lua_pushinteger(L,peer.nl_pid);
+	return 2;
 }
 /*-------------------------------------------------------------------------*\
 * Just call tm methods
@@ -314,18 +332,6 @@ static int meth_gettimeout(lua_State *L)
 {
     p_netlink nl = (p_netlink) auxiliar_checkgroup(L, "netlink{any}", 1);
     return timeout_meth_gettimeout(L, &nl->tm);
-}
-
-/*-------------------------------------------------------------------------*\
-* Just call tm methods
-\*-------------------------------------------------------------------------*/
-static int meth_setoptions(lua_State *L){
-	p_netlink nl = (p_netlink) auxiliar_checkgroup(L,"netlink{any}",1);
-	if(!lua_isnil(L,2))
-		nl->srcpid = luaL_checkinteger(L,2);
-	if(!lua_isnil(L,3))
-		nl->grp = luaL_checkinteger(L,3);
-	return 0;
 }
 
 /*=========================================================================*\
