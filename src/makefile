@@ -18,7 +18,7 @@ PLAT?=linux
 
 # LUAV: 5.1 5.2
 # lua version to build against
-LUAV?=5.1
+LUAV?=5.3
 
 # MYCFLAGS: to be set by user if needed
 MYCFLAGS?=
@@ -288,6 +288,7 @@ SOCKET_OBJS= \
 	except.$(O) \
 	select.$(O) \
 	tcp.$(O) \
+	netlink.$(O) \
 	udp.$(O)
 
 #------
