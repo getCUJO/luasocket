@@ -71,6 +71,8 @@ SRC = \
 	src/usocket.h \
 	src/wsocket.c \
 	src/wsocket.h \
+	src/netlink.c \
+	src/netlink.h \
 	src/ftp.lua \
 	src/http.lua \
 	src/ltn12.lua \

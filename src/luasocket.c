@@ -30,9 +30,6 @@
 #include "inet.h"
 #include "tcp.h"
 #include "udp.h"
-#ifdef LUASOCKET_NETLINK
-#include "netlink.h"
-#endif
 #include "select.h"
 
 /*-------------------------------------------------------------------------*\
@@ -54,9 +51,6 @@ static const luaL_Reg mod[] = {
     {"tcp", tcp_open},
     {"udp", udp_open},
     {"select", select_open},
-#ifdef LUASOCKET_NETLINK
-    {"netlink", netlink_open},
-#endif
     {NULL, NULL}
 };
 

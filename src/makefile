@@ -152,6 +152,7 @@ CC_macosx=gcc
 DEF_macosx= -DLUASOCKET_$(DEBUG) -DUNIX_HAS_SUN_LEN \
 	-DLUASOCKET_API='__attribute__((visibility("default")))' \
 	-DUNIX_API='__attribute__((visibility("default")))' \
+	-DNETLINK_API='__attribute__((visibility("default")))' \
 	-DMIME_API='__attribute__((visibility("default")))'
 CFLAGS_macosx= -I$(LUAINC) $(DEF) -Wall -O2 -fno-common \
 	-fvisibility=hidden
@@ -168,6 +169,7 @@ CC_linux=gcc
 DEF_linux=-DLUASOCKET_$(DEBUG) \
 	-DLUASOCKET_API='__attribute__((visibility("default")))' \
 	-DUNIX_API='__attribute__((visibility("default")))' \
+	-DNETLINK_API='__attribute__((visibility("default")))' \
 	-DMIME_API='__attribute__((visibility("default")))'
 CFLAGS_linux= -I$(LUAINC) $(DEF) -Wall -Wshadow -Wextra \
 	-Wimplicit -O2 -ggdb3 -fpic -fvisibility=hidden
@@ -184,6 +186,7 @@ CC_freebsd=gcc
 DEF_freebsd=-DLUASOCKET_$(DEBUG) \
 	-DLUASOCKET_API='__attribute__((visibility("default")))' \
 	-DUNIX_API='__attribute__((visibility("default")))' \
+	-DNETLINK_API='__attribute__((visibility("default")))' \
 	-DMIME_API='__attribute__((visibility("default")))'
 CFLAGS_freebsd= -I$(LUAINC) $(DEF) -Wall -Wshadow -Wextra \
 	-Wimplicit -O2 -ggdb3 -fpic -fvisibility=hidden
@@ -200,6 +203,7 @@ CC_solaris=gcc
 DEF_solaris=-DLUASOCKET_$(DEBUG) \
 	-DLUASOCKET_API='__attribute__((visibility("default")))' \
 	-DUNIX_API='__attribute__((visibility("default")))' \
+	-DNETLINK_API='__attribute__((visibility("default")))' \
 	-DMIME_API='__attribute__((visibility("default")))'
 CFLAGS_solaris=-I$(LUAINC) $(DEF) -Wall -Wshadow -Wextra \
 	-Wimplicit -O2 -ggdb3 -fpic -fvisibility=hidden   
@@ -259,6 +263,7 @@ SOCKET_SO=socket-$(SOCKET_V).$(SO)
 MIME_SO=mime-$(MIME_V).$(SO)
 UNIX_SO=unix.$(SO)
 SERIAL_SO=serial.$(SO)
+NETLINK_SO=netlink.$(SO)
 SOCKET=$(SOCKET_$(PLAT))
 
 #------
@@ -288,7 +293,6 @@ SOCKET_OBJS= \
 	except.$(O) \
 	select.$(O) \
 	tcp.$(O) \
-	netlink.$(O) \
 	udp.$(O)
 
 #------
@@ -324,6 +328,16 @@ SERIAL_OBJS=\
 	io.$(O) \
 	usocket.$(O) \
 	serial.$(O)
+#------
+# Modules belonging to netlink
+#
+NETLINK_OBJS=\
+	auxiliar.$(O) \
+	timeout.$(O) \
+	usocket.$(O) \
+	io.$(O) \
+	netlink.$(O) \
+	compat.$(O) 
 
 #------
 # Files to install
@@ -379,13 +393,16 @@ $(SOCKET_SO): $(SOCKET_OBJS)
 $(MIME_SO): $(MIME_OBJS)
 	$(LD) $(MIME_OBJS) $(LDFLAGS)$@
 
-all-unix: all $(UNIX_SO) $(SERIAL_SO)
+all-unix: all $(UNIX_SO) $(SERIAL_SO) $(NETLINK_SO)
 
 $(UNIX_SO): $(UNIX_OBJS)
 	$(LD) $(UNIX_OBJS) $(LDFLAGS)$@
 
 $(SERIAL_SO): $(SERIAL_OBJS)
 	$(LD) $(SERIAL_OBJS) $(LDFLAGS)$@
+
+$(NETLINK_SO): $(NETLINK_OBJS)
+	$(LD) $(NETLINK_OBJS) $(LDFLAGS)$@
 
 install: 
 	$(INSTALL_DIR) $(INSTALL_TOP_LDIR)
@@ -400,13 +417,15 @@ install:
 install-unix: install
 	$(INSTALL_EXEC) $(UNIX_SO) $(INSTALL_SOCKET_CDIR)/$(UNIX_SO)
 	$(INSTALL_EXEC) $(SERIAL_SO) $(INSTALL_SOCKET_CDIR)/$(SERIAL_SO)
+	$(INSTALL_EXEC) $(NETLINK_SO) $(INSTALL_SOCKET_CDIR)/$(NETLINK_SO)
 
 local:
 	$(MAKE) install INSTALL_TOP_CDIR=.. INSTALL_TOP_LDIR=..
 
 clean:
 	rm -f $(SOCKET_SO) $(SOCKET_OBJS) $(SERIAL_OBJS)
-	rm -f $(MIME_SO) $(UNIX_SO) $(SERIAL_SO) $(MIME_OBJS) $(UNIX_OBJS)
+	rm -f $(MIME_SO) $(UNIX_SO) $(SERIAL_SO) $(NETLINK_SO) $(MIME_OBJS) 
+	rm -f $(UNIX_OBJS) $(NETLINK_OBJS)
 
 .PHONY: all $(PLATS) default clean echo none
 
@@ -437,3 +456,5 @@ unix.$(O): unix.c auxiliar.h socket.h io.h timeout.h usocket.h \
 	options.h unix.h buffer.h
 usocket.$(O): usocket.c socket.h io.h timeout.h usocket.h
 wsocket.$(O): wsocket.c socket.h io.h timeout.h usocket.h
+netlink.$(O): netlink.c socket.h timeout.h auxiliar.h compat.h \
+	netlink.h usocket.h io.h
