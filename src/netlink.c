@@ -92,13 +92,13 @@ static int meth_send(lua_State *L) {
     int err;
 
     memset(nlh, 0, NLMSG_SPACE(payload_size));
-    nlh->nlmsg_len = NLMSG_SPACE(payload_size);
+    nlh->nlmsg_len = NLMSG_LENGTH(payload_size);
     nlh->nlmsg_pid = nl->srcpid;
     nlh->nlmsg_flags = flags;
     memcpy(NLMSG_DATA(nlh), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_send(&nl->fd, (char *)nlh, nlh->nlmsg_len, &sent, tm);
+    err = socket_send(&nl->fd, (char *)nlh, NLMSG_SPACE(payload_size), &sent, tm);
     if (err != IO_DONE) {
         lua_pushnil(L);
         lua_pushliteral(L, "error sending message");
@@ -131,13 +131,13 @@ static int meth_sendto(lua_State *L) {
     addr.nl_groups = groups;
 
     memset(nlh, 0, NLMSG_SPACE(payload_size));
-    nlh->nlmsg_len = NLMSG_SPACE(payload_size);
+    nlh->nlmsg_len = NLMSG_LENGTH(payload_size);
     nlh->nlmsg_pid = nl->srcpid;
     nlh->nlmsg_flags = flags;
     memcpy(NLMSG_DATA(nlh), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_sendto(&nl->fd, (char *)nlh, nlh->nlmsg_len, &sent, 
+    err = socket_sendto(&nl->fd, (char *)nlh, NLMSG_SPACE(payload_size), &sent,
             (SA *)&addr, sizeof(addr), tm);
     if (err != IO_DONE) {
         lua_pushnil(L);
@@ -160,9 +160,8 @@ static int meth_receive(lua_State *L) {
     int err;
 
     memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
     timeout_markstart(tm);
-    err = socket_recv(&nl->fd, (char *)nlh, nlh->nlmsg_len, &got, tm);
+    err = socket_recv(&nl->fd, (char *)nlh, NLMSG_SPACE(MAX_PAYLOAD), &got, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
         lua_pushnil(L);
         lua_pushstring(L, socket_strerror(err));
@@ -186,10 +185,9 @@ static int meth_receivefrom(lua_State *L) {
     int err;
 
     memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));
-    nlh->nlmsg_len = NLMSG_SPACE(MAX_PAYLOAD);
     socklen_t len = sizeof(dst);
     timeout_markstart(tm);
-    err = socket_recvfrom(&nl->fd, (char *)nlh, nlh->nlmsg_len, &got, 
+    err = socket_recvfrom(&nl->fd, (char *)nlh, NLMSG_SPACE(MAX_PAYLOAD), &got,
             (SA *)&dst, &len, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
         lua_pushnil(L);
