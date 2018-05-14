@@ -79,6 +79,11 @@ local function make_plat(plat)
 			defines = defines[plat],
 			incdir = "/src"
 		}
+		modules["socket.file"] = {
+			sources = { "src/buffer.c", "src/auxiliar.c", "src/options.c", "src/timeout.c", "src/io.c", "src/usocket.c", "src/filestream.c" },
+			defines = defines[plat],
+			incdir = "/src"
+		}
 		modules["socket.serial"] = {
 			sources = { "src/buffer.c", "src/auxiliar.c", "src/options.c", "src/timeout.c", "src/io.c", "src/usocket.c", "src/serial.c" },
 			defines = defines[plat],
