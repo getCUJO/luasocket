@@ -3,6 +3,9 @@
 * LuaSocket toolkit
 \*=========================================================================*/
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -12,10 +15,6 @@
 #include "socket.h"
 #include "options.h"
 #include "filestream.h"
-
- #include <sys/types.h>
- #include <sys/stat.h>
- #include <fcntl.h>
 
 /*=========================================================================*\
 * Internal function prototypes
@@ -49,7 +48,7 @@ static luaL_Reg filestream_methods[] = {
 
 /* functions in library namespace */
 static luaL_Reg func[] = {
-	{"file", global_create},
+	{"open", global_create},
 	{NULL, NULL}
 };
 
@@ -96,20 +95,20 @@ static int meth_setstats(lua_State *L) {
 * Select support methods
 \*-------------------------------------------------------------------------*/
 static int meth_getfd(lua_State *L) {
-	p_file fl = (p_file) auxiliar_checkgroup(L, "filestream", 1);
+	p_file fl = (p_file) auxiliar_checkclass(L, "filestream", 1);
 	lua_pushnumber(L, (int) fl->sock);
 	return 1;
 }
 
 /* this is very dangerous, but can be handy for those that are brave enough */
 static int meth_setfd(lua_State *L) {
-	p_file fl = (p_file) auxiliar_checkgroup(L, "filestream", 1);
+	p_file fl = (p_file) auxiliar_checkclass(L, "filestream", 1);
 	fl->sock = (t_socket) luaL_checknumber(L, 2);
 	return 0;
 }
 
 static int meth_dirty(lua_State *L) {
-	p_file fl = (p_file) auxiliar_checkgroup(L, "filestream", 1);
+	p_file fl = (p_file) auxiliar_checkclass(L, "filestream", 1);
 	lua_pushboolean(L, !buffer_isempty(&fl->buf));
 	return 1;
 }
@@ -119,7 +118,7 @@ static int meth_dirty(lua_State *L) {
 \*-------------------------------------------------------------------------*/
 static int meth_close(lua_State *L)
 {
-	p_file fl = (p_file) auxiliar_checkgroup(L, "filestream", 1);
+	p_file fl = (p_file) auxiliar_checkclass(L, "filestream", 1);
 	socket_destroy(&fl->sock);
 	lua_pushnumber(L, 1);
 	return 1;
@@ -129,7 +128,7 @@ static int meth_close(lua_State *L)
 * Just call tm methods
 \*-------------------------------------------------------------------------*/
 static int meth_settimeout(lua_State *L) {
-	p_file fl = (p_file) auxiliar_checkgroup(L, "filestream", 1);
+	p_file fl = (p_file) auxiliar_checkclass(L, "filestream", 1);
 	return timeout_meth_settimeout(L, &fl->tm);
 }
 
@@ -179,7 +178,7 @@ static int global_create(lua_State *L) {
 		/* initialize remaining structure fields */
 		socket_setnonblocking(&sock);
 		fl->sock = sock;
-		io_init(&fl->io, (p_send) socket_send, (p_recv) socket_recv,
+		io_init(&fl->io, (p_send) socket_write, (p_recv) socket_read,
 		        (p_error) socket_ioerror, &fl->sock);
 		timeout_init(&fl->tm, -1, -1);
 		buffer_init(&fl->buf, &fl->io, &fl->tm);

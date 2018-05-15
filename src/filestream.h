@@ -6,8 +6,8 @@
 #include "timeout.h"
 #include "socket.h"
 
-#ifndef FILE_API
-#define FILE_API extern
+#ifndef FILESOCK_API
+#define FILESOCK_API extern
 #endif
 
 typedef struct t_file_ {
@@ -18,8 +18,6 @@ typedef struct t_file_ {
 } t_file;
 typedef t_file *p_file;
 
-FILE_API int luaopen_socket_file(lua_State *L);
-
-int filestream_open(lua_State *L);
+FILESOCK_API int luaopen_socket_file(lua_State *L);
 
 #endif /* FILESTREAM_H */
