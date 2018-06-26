@@ -156,6 +156,7 @@ static int meth_receive(lua_State *L) {
     p_netlink nl = (p_netlink)auxiliar_checkclass(L, "netlink{connected}", 1);
     struct nlmsghdr nlh[NLMSG_SPACE(MAX_PAYLOAD)];
     size_t got;
+    size_t payload_size;
     p_timeout tm = &nl->tm;
     int err;
 
@@ -168,8 +169,11 @@ static int meth_receive(lua_State *L) {
         return 2;
     }
 
-    lua_pushinteger(L, got);
-    lua_pushlstring(L, NLMSG_DATA(nlh), got);
+    payload_size = got < nlh->nlmsg_len ? MAX_PAYLOAD :
+	NLMSG_PAYLOAD(nlh, 0);
+
+    lua_pushinteger(L, payload_size);
+    lua_pushlstring(L, NLMSG_DATA(nlh), payload_size);
     return 2;
 }
 
@@ -181,6 +185,7 @@ static int meth_receivefrom(lua_State *L) {
     struct nlmsghdr nlh[NLMSG_SPACE(MAX_PAYLOAD)];
     struct sockaddr_nl dst;
     size_t got;
+    size_t payload_size;
     p_timeout tm = &nl->tm;
     int err;
 
@@ -195,8 +200,11 @@ static int meth_receivefrom(lua_State *L) {
         return 2;
     }
 
-    lua_pushinteger(L, got);
-    lua_pushlstring(L, NLMSG_DATA(nlh), got);
+    payload_size = got < nlh->nlmsg_len ? MAX_PAYLOAD :
+	NLMSG_PAYLOAD(nlh, 0);
+
+    lua_pushinteger(L, payload_size);
+    lua_pushlstring(L, NLMSG_DATA(nlh), payload_size);
     lua_pushinteger(L, nlh->nlmsg_pid);
     return 3;
 }
