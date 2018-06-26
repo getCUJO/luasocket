@@ -195,6 +195,8 @@ static int meth_receivefrom(lua_State *L) {
         return 2;
     }
 
+    got = got > NLMSG_SPACE(MAX_PAYLOAD) ? MAX_PAYLOAD : NLMSG_PAYLOAD(nlh, 0);
+
     lua_pushinteger(L, got);
     lua_pushlstring(L, NLMSG_DATA(nlh), got);
     lua_pushinteger(L, nlh->nlmsg_pid);
