@@ -18,7 +18,7 @@
 #include "lua.h"
 #include "socket.h"
 
-#define MAX_PAYLOAD 65536
+#define MAX_PAYLOAD 3072
 
 typedef int t_pid;
 typedef int t_groups;
