@@ -90,10 +90,15 @@ static int meth_send(lua_State *L) {
     size_t payload_size;
     const char *payload = luaL_checklstring(L, 2, &payload_size);
     int flags = luaL_optinteger(L, 3, 0);
-    struct nlmsgbuf nlb;
-    p_timeout tm = &nl->tm; 
+    p_timeout tm = &nl->tm;
     size_t sent = 0;
     int err;
+    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
+    if (nlb == NULL) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "couldn't allocate buffer for netlink");
+        return 2;
+    }
 
     if (payload_size > NLMSG_ALIGN(MAX_PAYLOAD)) {
         lua_pushnil(L);
@@ -101,15 +106,17 @@ static int meth_send(lua_State *L) {
         return 2;
     }
 
-    nlb.hdr = (struct nlmsghdr) {
+    nlb->hdr = (struct nlmsghdr) {
         .nlmsg_len = NLMSG_LENGTH(payload_size),
         .nlmsg_pid = nl->srcpid,
         .nlmsg_flags = flags
     };
-    memcpy(NLMSG_DATA(&nlb), payload, payload_size);
+    memcpy(NLMSG_DATA(nlb), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_send(&nl->fd, (char *)&nlb, NLMSG_SPACE(payload_size), &sent, tm);
+    err = socket_send(&nl->fd, (char *)nlb, NLMSG_SPACE(payload_size), &sent, tm);
+
+    free(nlb);
     if (err != IO_DONE) {
         lua_pushnil(L);
         lua_pushliteral(L, "error sending message");
@@ -130,9 +137,15 @@ static int meth_sendto(lua_State *L) {
     int dstpid = luaL_checkinteger(L, 3);
     int groups = luaL_optinteger(L, 4, 0);
     int flags = luaL_optinteger(L, 5, 0);
-    struct nlmsgbuf nlb;
+    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
+    if (nlb == NULL) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "couldn't allocate buffer for netlink");
+        return 2;
+    }
+
     struct sockaddr_nl addr;
-    p_timeout tm = &nl->tm; 
+    p_timeout tm = &nl->tm;
     size_t sent = 0;
     int err;
 
@@ -147,16 +160,18 @@ static int meth_sendto(lua_State *L) {
     addr.nl_family = AF_NETLINK;
     addr.nl_groups = groups;
 
-    nlb.hdr = (struct nlmsghdr) {
+    nlb->hdr = (struct nlmsghdr) {
         .nlmsg_len = NLMSG_LENGTH(payload_size),
         .nlmsg_pid = nl->srcpid,
         .nlmsg_flags = flags
     };
-    memcpy(NLMSG_DATA(&nlb), payload, payload_size);
+    memcpy(NLMSG_DATA(nlb), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_sendto(&nl->fd, (char *)&nlb, NLMSG_SPACE(payload_size), &sent,
+    err = socket_sendto(&nl->fd, (char *)nlb, NLMSG_SPACE(payload_size), &sent,
             (SA *)&addr, sizeof(addr), tm);
+
+    free(nlb);
     if (err != IO_DONE) {
         lua_pushnil(L);
         lua_pushliteral(L, "error sending message");
@@ -172,25 +187,33 @@ static int meth_sendto(lua_State *L) {
 \*-------------------------------------------------------------------------*/
 static int meth_receive(lua_State *L) {
     p_netlink nl = (p_netlink)auxiliar_checkclass(L, "netlink{connected}", 1);
-    struct nlmsgbuf nlb;
     size_t got;
     size_t payload_size;
     p_timeout tm = &nl->tm;
     int err;
 
+    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
+    if (nlb == NULL) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "couldn't allocate buffer for netlink");
+        return 2;
+    }
+
     timeout_markstart(tm);
-    err = socket_recv(&nl->fd, (char *)&nlb, NLMSG_SPACE(MAX_PAYLOAD), &got, tm);
+    err = socket_recv(&nl->fd, (char *)nlb, NLMSG_SPACE(MAX_PAYLOAD), &got, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
+        free(nlb);
         lua_pushnil(L);
         lua_pushstring(L, socket_strerror(err));
         return 2;
     }
 
-    payload_size = got < nlb.hdr.nlmsg_len ? MAX_PAYLOAD :
-	NLMSG_PAYLOAD(&nlb.hdr, 0);
+    payload_size = got < nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
+	NLMSG_PAYLOAD(&nlb->hdr, 0);
 
     lua_pushinteger(L, payload_size);
-    lua_pushlstring(L, NLMSG_DATA(&nlb), payload_size);
+    lua_pushlstring(L, NLMSG_DATA(nlb), payload_size);
+    free(nlb);
     return 2;
 }
 
@@ -199,29 +222,37 @@ static int meth_receive(lua_State *L) {
 \*-------------------------------------------------------------------------*/
 static int meth_receivefrom(lua_State *L) {
     p_netlink nl = (p_netlink)auxiliar_checkclass(L, "netlink{unconnected}", 1);
-    struct nlmsgbuf nlb;
     struct sockaddr_nl dst;
     size_t got;
     size_t payload_size;
     p_timeout tm = &nl->tm;
     int err;
 
+    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
+    if (nlb == NULL) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "couldn't allocate buffer for netlink");
+        return 2;
+    }
+
     socklen_t len = sizeof(dst);
     timeout_markstart(tm);
-    err = socket_recvfrom(&nl->fd, (char *)&nlb, NLMSG_SPACE(MAX_PAYLOAD), &got,
+    err = socket_recvfrom(&nl->fd, (char *)nlb, NLMSG_SPACE(MAX_PAYLOAD), &got,
             (SA *)&dst, &len, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
+        free(nlb);
         lua_pushnil(L);
         lua_pushstring(L, socket_strerror(err));
         return 2;
     }
 
-    payload_size = got < nlb.hdr.nlmsg_len ? MAX_PAYLOAD :
-	NLMSG_PAYLOAD(&nlb.hdr, 0);
+    payload_size = got < nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
+	NLMSG_PAYLOAD(&nlb->hdr, 0);
 
     lua_pushinteger(L, payload_size);
-    lua_pushlstring(L, NLMSG_DATA(&nlb), payload_size);
-    lua_pushinteger(L, nlb.hdr.nlmsg_pid);
+    lua_pushlstring(L, NLMSG_DATA(nlb), payload_size);
+    lua_pushinteger(L, nlb->hdr.nlmsg_pid);
+    free(nlb);
     return 3;
 }
 
@@ -256,7 +287,7 @@ static const char *netlink_trybind(p_netlink nl, int grp) {
 
     memset(&addr, 0, sizeof(addr));
     addr.nl_family = AF_NETLINK;
-    addr.nl_groups = grp;	
+    addr.nl_groups = grp;
     addr.nl_pid = nl->srcpid;
     getpeername(nl->fd, (SA *)&addr, (socklen_t *)sizeof(addr));
     err = socket_bind(&nl->fd, (SA *)&addr, sizeof(addr));
@@ -304,7 +335,7 @@ static int meth_setpeername(lua_State *L) {
 
     if (lua_isnone(L, 2)) {
         addr.nl_family = AF_UNSPEC;
-        socket_connect(&nl->fd, (SA *)&addr, 
+        socket_connect(&nl->fd, (SA *)&addr,
                 (socklen_t)sizeof(addr), &nl->tm);
         auxiliar_setclass(L, "netlink{unconnected}", 1);
         return 0;
