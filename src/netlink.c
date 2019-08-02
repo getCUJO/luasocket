@@ -95,6 +95,12 @@ static int meth_send(lua_State *L) {
     size_t sent = 0;
     int err;
 
+    if (payload_size > NLMSG_ALIGN(MAX_PAYLOAD)) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "payload too big");
+        return 2;
+    }
+
     nlb.hdr = (struct nlmsghdr) {
         .nlmsg_len = NLMSG_LENGTH(payload_size),
         .nlmsg_pid = nl->srcpid,
