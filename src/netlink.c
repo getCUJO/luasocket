@@ -130,6 +130,12 @@ static int meth_sendto(lua_State *L) {
     size_t sent = 0;
     int err;
 
+    if (payload_size > NLMSG_ALIGN(MAX_PAYLOAD)) {
+        lua_pushnil(L);
+        lua_pushliteral(L, "payload too big");
+        return 2;
+    }
+
     memset(&addr, 0, sizeof(addr));
     addr.nl_pid = dstpid;
     addr.nl_family = AF_NETLINK;
