@@ -14,6 +14,8 @@
  * * break the connection.
 \*=========================================================================*/
 
+#include <linux/netlink.h>
+
 #include "timeout.h"
 #include "lua.h"
 #include "socket.h"
@@ -24,11 +26,17 @@ typedef int t_pid;
 typedef int t_groups;
 typedef int t_type;
 
+struct nlmsgbuf{
+    struct nlmsghdr hdr;
+    char msg[NLMSG_ALIGN(MAX_PAYLOAD)] __attribute__((aligned(NLMSG_ALIGNTO)));
+};
+
 typedef struct {
     t_socket fd; 
     t_timeout tm;  
     t_pid srcpid; 
     t_type type; 
+    struct nlmsgbuf *nlb;
 } t_netlink;
 typedef t_netlink *p_netlink;
 

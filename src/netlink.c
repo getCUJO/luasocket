@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <linux/netlink.h>
 #include "netlink.h"
 #include "timeout.h"
 #include "lua.h"
@@ -34,10 +33,6 @@ static int meth_setpeername(lua_State *L);
 static int meth_getsockpid(lua_State *L);
 
 static const char *netlink_trybind(p_netlink nl, int grp);
-struct nlmsgbuf{
-    struct nlmsghdr hdr;
-    char msg[NLMSG_ALIGN(MAX_PAYLOAD)] __attribute__((aligned(NLMSG_ALIGNTO)));
-};
 
 /* netlink object methods */
 static luaL_Reg netlink_methods[] = {
@@ -93,12 +88,6 @@ static int meth_send(lua_State *L) {
     p_timeout tm = &nl->tm;
     size_t sent = 0;
     int err;
-    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
-    if (nlb == NULL) {
-        lua_pushnil(L);
-        lua_pushliteral(L, "couldn't allocate buffer for netlink");
-        return 2;
-    }
 
     if (payload_size > NLMSG_ALIGN(MAX_PAYLOAD)) {
         lua_pushnil(L);
@@ -106,17 +95,16 @@ static int meth_send(lua_State *L) {
         return 2;
     }
 
-    nlb->hdr = (struct nlmsghdr) {
+    nl->nlb->hdr = (struct nlmsghdr) {
         .nlmsg_len = NLMSG_LENGTH(payload_size),
         .nlmsg_pid = nl->srcpid,
         .nlmsg_flags = flags
     };
-    memcpy(NLMSG_DATA(nlb), payload, payload_size);
+    memcpy(NLMSG_DATA(nl->nlb), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_send(&nl->fd, (char *)nlb, NLMSG_SPACE(payload_size), &sent, tm);
+    err = socket_send(&nl->fd, (const char *)nl->nlb, NLMSG_SPACE(payload_size), &sent, tm);
 
-    free(nlb);
     if (err != IO_DONE) {
         lua_pushnil(L);
         lua_pushliteral(L, "error sending message");
@@ -137,12 +125,6 @@ static int meth_sendto(lua_State *L) {
     int dstpid = luaL_checkinteger(L, 3);
     int groups = luaL_optinteger(L, 4, 0);
     int flags = luaL_optinteger(L, 5, 0);
-    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
-    if (nlb == NULL) {
-        lua_pushnil(L);
-        lua_pushliteral(L, "couldn't allocate buffer for netlink");
-        return 2;
-    }
 
     struct sockaddr_nl addr;
     p_timeout tm = &nl->tm;
@@ -160,18 +142,17 @@ static int meth_sendto(lua_State *L) {
     addr.nl_family = AF_NETLINK;
     addr.nl_groups = groups;
 
-    nlb->hdr = (struct nlmsghdr) {
+    nl->nlb->hdr = (struct nlmsghdr) {
         .nlmsg_len = NLMSG_LENGTH(payload_size),
         .nlmsg_pid = nl->srcpid,
         .nlmsg_flags = flags
     };
-    memcpy(NLMSG_DATA(nlb), payload, payload_size);
+    memcpy(NLMSG_DATA(nl->nlb), payload, payload_size);
     timeout_markstart(tm);
 
-    err = socket_sendto(&nl->fd, (char *)nlb, NLMSG_SPACE(payload_size), &sent,
+    err = socket_sendto(&nl->fd, (const char *)nl->nlb, NLMSG_SPACE(payload_size), &sent,
             (SA *)&addr, sizeof(addr), tm);
 
-    free(nlb);
     if (err != IO_DONE) {
         lua_pushnil(L);
         lua_pushliteral(L, "error sending message");
@@ -192,28 +173,19 @@ static int meth_receive(lua_State *L) {
     p_timeout tm = &nl->tm;
     int err;
 
-    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
-    if (nlb == NULL) {
-        lua_pushnil(L);
-        lua_pushliteral(L, "couldn't allocate buffer for netlink");
-        return 2;
-    }
-
     timeout_markstart(tm);
-    err = socket_recv(&nl->fd, (char *)nlb, NLMSG_SPACE(MAX_PAYLOAD), &got, tm);
+    err = socket_recv(&nl->fd, (char *)nl->nlb, NLMSG_SPACE(MAX_PAYLOAD), &got, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
-        free(nlb);
         lua_pushnil(L);
         lua_pushstring(L, socket_strerror(err));
         return 2;
     }
 
-    payload_size = got < nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
-	NLMSG_PAYLOAD(&nlb->hdr, 0);
+    payload_size = got < nl->nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
+        NLMSG_PAYLOAD(&nl->nlb->hdr, 0);
 
     lua_pushinteger(L, payload_size);
-    lua_pushlstring(L, NLMSG_DATA(nlb), payload_size);
-    free(nlb);
+    lua_pushlstring(L, NLMSG_DATA(nl->nlb), payload_size);
     return 2;
 }
 
@@ -228,31 +200,22 @@ static int meth_receivefrom(lua_State *L) {
     p_timeout tm = &nl->tm;
     int err;
 
-    struct nlmsgbuf *nlb = malloc(sizeof(struct nlmsgbuf));
-    if (nlb == NULL) {
-        lua_pushnil(L);
-        lua_pushliteral(L, "couldn't allocate buffer for netlink");
-        return 2;
-    }
-
     socklen_t len = sizeof(dst);
     timeout_markstart(tm);
-    err = socket_recvfrom(&nl->fd, (char *)nlb, NLMSG_SPACE(MAX_PAYLOAD), &got,
+    err = socket_recvfrom(&nl->fd, (char *)nl->nlb, NLMSG_SPACE(MAX_PAYLOAD), &got,
             (SA *)&dst, &len, tm);
     if (err != IO_DONE && err != IO_CLOSED) {
-        free(nlb);
         lua_pushnil(L);
         lua_pushstring(L, socket_strerror(err));
         return 2;
     }
 
-    payload_size = got < nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
-	NLMSG_PAYLOAD(&nlb->hdr, 0);
+    payload_size = got < nl->nlb->hdr.nlmsg_len ? MAX_PAYLOAD :
+        NLMSG_PAYLOAD(&nl->nlb->hdr, 0);
 
     lua_pushinteger(L, payload_size);
-    lua_pushlstring(L, NLMSG_DATA(nlb), payload_size);
-    lua_pushinteger(L, nlb->hdr.nlmsg_pid);
-    free(nlb);
+    lua_pushlstring(L, NLMSG_DATA(nl->nlb), payload_size);
+    lua_pushinteger(L, nl->nlb->hdr.nlmsg_pid);
     return 3;
 }
 
@@ -319,6 +282,10 @@ static int meth_bind(lua_State *L) {
 static int meth_close(lua_State *L) {
     p_netlink nl = (p_netlink)auxiliar_checkgroup(L, "netlink{any}", 1);
     socket_destroy(&nl->fd);
+    if (nl->nlb) {
+        free(nl->nlb);
+        nl->nlb = NULL;
+    }
     lua_pushnumber(L, 1);
     return 1;
 }
@@ -402,6 +369,13 @@ static int global_create(lua_State *L) {
     if (err == IO_DONE) {
         /* allocate netlink  object */
         p_netlink nl = (p_netlink)lua_newuserdata(L, sizeof(t_netlink));
+        nl->nlb = malloc(sizeof(struct nlmsgbuf));
+        if (!nl->nlb) {
+            socket_destroy(&sock);
+            lua_pushnil(L);
+            lua_pushstring(L, "couldn't allocate buffer for netlink");
+            return 2;
+        }
         /* set its type as master object */
         auxiliar_setclass(L, "netlink{unconnected}", -1);
         /* initialize remaining structure fields */
