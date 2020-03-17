@@ -476,6 +476,7 @@ static int resolve_nl_family_id(lua_State *L) {
     }
 
     nl_na = (struct nlattr *) GENLMSG_DATA(nl->nlgb);
+    /* Skip first message attribute which is family name */
     nl_na = (struct nlattr *) ((char *) nl_na + NLA_ALIGN(nl_na->nla_len));
     if (nl_na->nla_type == CTRL_ATTR_FAMILY_ID) {
         nl_family_id = *(__u16 *) NLA_DATA(nl_na);
@@ -512,13 +513,17 @@ static int meth_receivefrom_generic_nflua(lua_State *L) {
         return 2;
     }
 
+    struct nlattr *nl_na = (struct nlattr *) GENLMSG_DATA(nl->nlgb);
+
     if (nl->nlgb->n.nlmsg_type == NLMSG_ERROR) {
+        char buf[255];
+        memset(buf, 0, sizeof(buf));
+        payload_size = snprintf(buf, "received message error: %s", (char *)NLA_DATA(nl_na), sizeof(buf));
         lua_pushnil(L);
-        lua_pushliteral(L, "received message error");
+        lua_pushlstring(L, buf, payload_size);
         return 2;
     }
 
-    struct nlattr *nl_na = (struct nlattr *) GENLMSG_DATA(nl->nlgb);
     payload_size = nl_na->nla_len - NLA_HDRLEN;
 
     lua_pushinteger(L, payload_size);
