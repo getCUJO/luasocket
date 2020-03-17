@@ -516,11 +516,8 @@ static int meth_receivefrom_generic_nflua(lua_State *L) {
     struct nlattr *nl_na = (struct nlattr *) GENLMSG_DATA(nl->nlgb);
 
     if (nl->nlgb->n.nlmsg_type == NLMSG_ERROR) {
-        char buf[255];
-        memset(buf, 0, sizeof(buf));
-        payload_size = snprintf(buf, "received message error: %s", (char *)NLA_DATA(nl_na), sizeof(buf));
         lua_pushnil(L);
-        lua_pushlstring(L, buf, payload_size);
+        lua_pushfstring(L, "received message error: %s", (char *)NLA_DATA(nl_na));
         return 2;
     }
 
