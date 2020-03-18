@@ -120,6 +120,36 @@ int opt_get_broadcast(lua_State *L, p_socket ps)
     return opt_getboolean(L, ps, SOL_SOCKET, SO_BROADCAST);
 }
 
+int opt_set_rcvbuf(lua_State *L, p_socket ps)
+{
+    return opt_setint(L, ps, SOL_SOCKET, SO_RCVBUF);
+}
+
+int opt_get_rcvbuf(lua_State *L, p_socket ps)
+{
+    return opt_getint(L, ps, SOL_SOCKET, SO_RCVBUF);
+}
+
+int opt_set_sndbuf(lua_State *L, p_socket ps)
+{
+    return opt_setint(L, ps, SOL_SOCKET, SO_SNDBUF);
+}
+
+int opt_get_sndbuf(lua_State *L, p_socket ps)
+{
+    return opt_getint(L, ps, SOL_SOCKET, SO_SNDBUF);
+}
+
+int opt_set_rcvbufforce(lua_State *L, p_socket ps)
+{
+    return opt_setint(L, ps, SOL_SOCKET, SO_RCVBUFFORCE);
+}
+
+int opt_set_sndbufforce(lua_State *L, p_socket ps)
+{
+    return opt_setint(L, ps, SOL_SOCKET, SO_SNDBUFFORCE);
+}
+
 int opt_set_ip6_unicast_hops(lua_State *L, p_socket ps)
 {
   return opt_setint(L, ps, IPPROTO_IPV6, IPV6_UNICAST_HOPS);
@@ -363,12 +393,12 @@ static int opt_getint(lua_State *L, p_socket ps, int level, int name)
     int err = opt_get(L, ps, level, name, (char *) &val, &len);
     if (err)
         return err;
-    lua_pushnumber(L, val);
+    lua_pushinteger(L, val);
     return 1;
 }
 
 static int opt_setint(lua_State *L, p_socket ps, int level, int name)
 {
-    int val = (int) lua_tonumber(L, 3);             /* obj, name, int */
+    int val = (int) lua_tointeger(L, 3);             /* obj, name, int */
     return opt_set(L, ps, level, name, (char *) &val, sizeof(val));
 }

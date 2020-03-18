@@ -65,6 +65,10 @@ static luaL_Reg unixdgram_methods[] = {
 /* socket option handlers */
 static t_opt optset[] = {
     {"reuseaddr",   opt_set_reuseaddr},
+    {"rcvbuf",      opt_set_rcvbuf},
+    {"sndbuf",      opt_set_sndbuf},
+    {"rcvbufforce", opt_set_rcvbufforce},
+    {"sndbufforce", opt_set_sndbufforce},
     {NULL,          NULL}
 };
 

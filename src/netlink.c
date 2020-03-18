@@ -12,6 +12,7 @@
 #include "compat.h"
 
 #include "auxiliar.h"
+#include "options.h"
 #include "socket.h"
 
 /*=========================================================================*\
@@ -26,6 +27,8 @@ static int meth_receive(lua_State *L);
 static int meth_close(lua_State *L);
 static int meth_settimeout(lua_State *L);
 static int meth_gettimeout(lua_State *L);
+static int meth_setoption(lua_State *L);
+static int meth_getoption(lua_State *L);
 static int meth_getfd(lua_State *L);
 static int meth_setfd(lua_State *L);
 static int meth_getpeername(lua_State *L);
@@ -53,12 +56,30 @@ static luaL_Reg netlink_methods[] = {
     {"setfd",       meth_setfd},
     {"settimeout",  meth_settimeout},
     {"gettimeout",  meth_gettimeout},
+    {"setoption",   meth_setoption},
+    {"getoption",   meth_getoption},
     {"setpeername", meth_setpeername},
     {"getpeername", meth_getpeername},
     {"getsockpid",  meth_getsockpid},
     {"sendtogennflua", meth_sendto_generic_nflua},
     {"receivefromgen", meth_receivefrom_generic_nflua},
     {NULL,          NULL}
+};
+
+/* socket options for setoption */
+static t_opt optset[] = {
+    {"rcvbuf",      opt_set_rcvbuf},
+    {"sndbuf",      opt_set_sndbuf},
+    {"rcvbufforce", opt_set_rcvbufforce},
+    {"sndbufforce", opt_set_sndbufforce},
+    {NULL,          NULL}
+};
+
+/* socket options for getoption */
+static t_opt optget[] = {
+    {"rcvbuf", opt_get_rcvbuf},
+    {"sndbuf", opt_get_sndbuf},
+    {NULL,     NULL}
 };
 
 /* functions in library namespace */
@@ -364,6 +385,22 @@ static int meth_settimeout(lua_State *L) {
 static int meth_gettimeout(lua_State *L) {
     p_netlink nl = (p_netlink)auxiliar_checkgroup(L, "netlink{any}", 1);
     return timeout_meth_gettimeout(L, &nl->tm);
+}
+
+/*-------------------------------------------------------------------------*\
+* Just call option handler
+\*-------------------------------------------------------------------------*/
+static int meth_setoption(lua_State *L) {
+    p_netlink nl = (p_netlink)auxiliar_checkgroup(L, "netlink{any}", 1);
+    return opt_meth_setoption(L, optset, &nl->fd);
+}
+
+/*-------------------------------------------------------------------------*\
+* Just call option handler
+\*-------------------------------------------------------------------------*/
+static int meth_getoption(lua_State *L) {
+    p_netlink nl = (p_netlink)auxiliar_checkgroup(L, "netlink{any}", 1);
+    return opt_meth_getoption(L, optget, &nl->fd);
 }
 
 /*=========================================================================*\
