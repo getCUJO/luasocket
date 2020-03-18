@@ -68,6 +68,10 @@ static t_opt optset[] = {
     {"keepalive",   opt_set_keepalive},
     {"reuseaddr",   opt_set_reuseaddr},
     {"linger",      opt_set_linger},
+    {"rcvbuf",      opt_set_rcvbuf},
+    {"sndbuf",      opt_set_sndbuf},
+    {"rcvbufforce", opt_set_rcvbufforce},
+    {"sndbufforce", opt_set_sndbufforce},
     {NULL,          NULL}
 };
 

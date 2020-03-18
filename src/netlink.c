@@ -68,11 +68,17 @@ static luaL_Reg netlink_methods[] = {
 
 /* socket options for setoption */
 static t_opt optset[] = {
+    {"rcvbuf",      opt_set_rcvbuf},
+    {"sndbuf",      opt_set_sndbuf},
+    {"rcvbufforce", opt_set_rcvbufforce},
+    {"sndbufforce", opt_set_sndbufforce},
     {NULL,          NULL}
 };
 
 /* socket options for getoption */
 static t_opt optget[] = {
+    {"rcvbuf", opt_get_rcvbuf},
+    {"sndbuf", opt_get_sndbuf},
     {NULL,     NULL}
 };
 
