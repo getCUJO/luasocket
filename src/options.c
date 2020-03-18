@@ -393,12 +393,12 @@ static int opt_getint(lua_State *L, p_socket ps, int level, int name)
     int err = opt_get(L, ps, level, name, (char *) &val, &len);
     if (err)
         return err;
-    lua_pushnumber(L, val);
+    lua_pushinteger(L, val);
     return 1;
 }
 
 static int opt_setint(lua_State *L, p_socket ps, int level, int name)
 {
-    int val = (int) lua_tonumber(L, 3);             /* obj, name, int */
+    int val = (int) lua_tointeger(L, 3);             /* obj, name, int */
     return opt_set(L, ps, level, name, (char *) &val, sizeof(val));
 }
