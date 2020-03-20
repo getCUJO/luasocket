@@ -592,7 +592,7 @@ static int meth_sendto_generic_nflua(lua_State *L) {
 
     if (payload_size > (MAX_PAYLOAD - GENL_HDRLEN)) {
         lua_pushnil(L);
-        lua_pushliteral(L, "payload too large");
+        lua_pushliteral(L, "payload too big");
         return 2;
     }
 
